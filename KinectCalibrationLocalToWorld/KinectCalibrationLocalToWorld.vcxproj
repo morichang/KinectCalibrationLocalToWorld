@@ -87,12 +87,8 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DINDClass.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="SVDCalibration.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="TransSVD2D.h" />
-    <ClInclude Include="TransZhang.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="KinectCalibrationLocalToWorld.cpp" />
