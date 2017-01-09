@@ -2,8 +2,8 @@
 //
 
 #include "stdafx.h"
-#include "DINDClass.h"
 
+//算出されたRとtから変換パラメータの行列を作ってやる
 inline cv::Mat make_3D_array(cv::Mat R, cv::Mat T)
 {
 	if (R.cols == 3 && T.cols == 1)
@@ -20,6 +20,7 @@ inline cv::Mat make_3D_array(cv::Mat R, cv::Mat T)
 	}
 }
 
+//点の書き込まれたtxtファイルから要素を取り出す
 void split(std::vector<std::string> &v, const std::string &input_string, const std::string &delimiter){
 	std::string::size_type index = input_string.find_first_of(delimiter);
 
@@ -38,8 +39,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::vector<cv::Point3d> localPoints;
 	std::vector<cv::Point3d> worldPoints;
 	std::string str;
+	std::string dind_id("DIND112");  //DIND104 to DIND112
 
-	std::ifstream ifs_uv("../../DIND108-20160530/DIND108-PC_uvPoints.txt");
+	std::ifstream ifs_uv("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_uvPoints.txt");
 	if (ifs_uv.fail()){
 		std::cerr << "失敗" << std::endl;
 		return -1;
@@ -52,7 +54,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		uvPoints.push_back(p);
 	}
 
-	std::ifstream ifs_local("../../DIND108-20160530/DIND108-PC_localPoints.txt");
+	std::ifstream ifs_local("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_localPoints.txt");
 	if (ifs_local.fail()){
 		std::cerr << "失敗" << std::endl;
 		return -1;
@@ -65,7 +67,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		localPoints.push_back(p);
 	}
 
-	std::ifstream ifs_world("../../DIND108-20160530/DIND108-PC_worldPoints.txt");
+	std::ifstream ifs_world("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_worldPoints.txt");
 	if (ifs_world.fail()){
 		std::cerr << "失敗" << std::endl;
 		return -1;
@@ -78,14 +80,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		worldPoints.push_back(p);
 	}
 
+	//WorldPoints確認
 	/*int i = 0;
-	while (i < 14){
-		std::cout << uvPoints[i] << std::endl;
-		std::cout << localPoints[i] << std::endl;
+	while (i < worldPoints.size()){
 		std::cout << worldPoints[i] << std::endl;
 		i++;
 	}*/
 
+	//カメラ行列の定義
 	double fx = 1081.37, fy = 1081.37, cx = 959.5, cy = 539.5;
 	cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) <<
 		fx, 0, cx,
@@ -96,7 +98,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	//回転行列を出す
 	try {
 		cv::solvePnP(worldPoints, uvPoints, cameraMatrix, cv::Mat(), rot, t);
-		cv::Rodrigues(rot, R);
+		cv::Rodrigues(rot, R);  //なんかcv::Rodrigues(R, R);だとOut of rangeが出た
 	}
 	catch (std::exception ex) {
 		std::cout << ex.what() << std::endl;
@@ -127,12 +129,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	auto ER = make_3D_array(R, t);
 	//std::cout << ER << std::endl;
 
-	cv::FileStorage wfs("_extrinsic.xml", cv::FileStorage::WRITE);
+	std::cout << "書き込みm@s!" << std::endl;
+
+	cv::FileStorage wfs("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_extrinsic_calc.xml", cv::FileStorage::WRITE);
 	wfs << "param3D_array" << ER;
 	wfs.release();
 
-	//Sleep(INFINITE);
-	//cv::waitKey(0);
+	std::cout << "Finish!" << std::endl;
+	Sleep(INFINITE);
 
 	return 0;
 }
