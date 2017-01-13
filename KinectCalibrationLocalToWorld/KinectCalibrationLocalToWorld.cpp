@@ -6,8 +6,7 @@
 //算出されたRとtから変換パラメータの行列を作ってやる
 inline cv::Mat make_3D_array(cv::Mat R, cv::Mat T)
 {
-	if (R.cols == 3 && T.cols == 1)
-	{
+	if (R.cols == 3 && T.cols == 1) {
 		cv::Mat param3D_array = (cv::Mat_<double>(4, 4) <<
 			R.at<double>(0, 0), R.at<double>(0, 1), R.at<double>(0, 2), T.at<double>(0),
 			R.at<double>(1, 0), R.at<double>(1, 1), R.at<double>(1, 2), T.at<double>(1),
@@ -15,7 +14,7 @@ inline cv::Mat make_3D_array(cv::Mat R, cv::Mat T)
 			0, 0, 0, 1);
 		return param3D_array;
 	}
-	else{
+	else {
 		std::cout << "Error" << std::endl;
 	}
 }
@@ -42,11 +41,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::string dind_id("DIND112");  //DIND104 to DIND112
 
 	std::ifstream ifs_uv("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_uvPoints.txt");
-	if (ifs_uv.fail()){
+	if (ifs_uv.fail()) {
 		std::cerr << "失敗" << std::endl;
 		return -1;
 	}
-	while (getline(ifs_uv, str)){
+	while (getline(ifs_uv, str)) {
 		std::vector<std::string> v_uv;
 		split(v_uv, str, ",");
 		cv::Point2d p(std::stod(v_uv[0]), std::stod(v_uv[1]));
@@ -55,11 +54,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	std::ifstream ifs_local("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_localPoints.txt");
-	if (ifs_local.fail()){
+	if (ifs_local.fail()) {
 		std::cerr << "失敗" << std::endl;
 		return -1;
 	}
-	while (getline(ifs_local, str)){
+	while (getline(ifs_local, str)) {
 		std::vector<std::string> v_local;
 		split(v_local, str, ",");
 		cv::Point3d p(std::stod(v_local[0]), std::stod(v_local[1]), std::stod(v_local[2]));
@@ -68,11 +67,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	std::ifstream ifs_world("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_worldPoints.txt");
-	if (ifs_world.fail()){
+	if (ifs_world.fail()) {
 		std::cerr << "失敗" << std::endl;
 		return -1;
 	}
-	while (getline(ifs_world, str)){
+	while (getline(ifs_world, str)) {
 		std::vector<std::string> v_world;
 		split(v_world, str, ",");
 		cv::Point3d p(std::stod(v_world[0]), std::stod(v_world[1]), std::stod(v_world[2]));
@@ -93,16 +92,32 @@ int _tmain(int argc, _TCHAR* argv[])
 		fx, 0, cx,
 		0, fy, cy,
 		0, 0, 1);
-	cv::Mat R, rot, t;
+	cv::Mat local_R, world_R;
+	cv::Mat local_r, world_r, local_t, world_t;
 
-	//回転行列を出す
-	try {
-		cv::solvePnP(worldPoints, uvPoints, cameraMatrix, cv::Mat(), rot, t);
-		cv::Rodrigues(rot, R);  //なんかcv::Rodrigues(R, R);だとOut of rangeが出た
+	//uv to localの回転行列を出す
+	try{
+		cv::solvePnP(localPoints, uvPoints, cameraMatrix, cv::Mat(), local_r, local_t);
+		cv::Rodrigues(local_r, local_R);  //なんかcv::Rodrigues(local_r, local_r);だとOut of rangeが出た
 	}
-	catch (std::exception ex) {
+	catch (std::exception ex){
 		std::cout << ex.what() << std::endl;
 	}
+
+	//uv to worldの回転行列を出す
+	try{
+		cv::solvePnP(worldPoints, uvPoints, cameraMatrix, cv::Mat(), world_r, world_t);
+		cv::Rodrigues(world_r, world_R);  //なんかcv::Rodrigues(world_r, world_r);だとOut of rangeが出た
+	}
+	catch(std::exception ex){
+		std::cout << ex.what() << std::endl;
+	}
+
+	local_r.release();
+	world_r.release();
+
+	//cv::composeRT(local_r, local_t, world_r, world_t, rot, t);
+	//cv::Rodrigues(rot, R);
 
 	//cv::FileStorage cvfs("../../DIND108-20160530/DIND108-PC_extrinsic.xml", cv::FileStorage::READ);  //DIND毎にここのパラメータxmlを変える
 	//if (!cvfs.isOpened()){
@@ -126,14 +141,28 @@ int _tmain(int argc, _TCHAR* argv[])
 	////cvfs["trans"] >> t;
 	////std::cout << t << std::endl;
 
-	auto ER = make_3D_array(R, t);
+	cv::Mat Rt[2];
+	auto LER = make_3D_array(local_R, local_t);
+	Rt[0] = LER.clone();
+	
+	auto WER = make_3D_array(world_R, world_t);
+	Rt[1] = WER.clone();
 	//std::cout << ER << std::endl;
 
 	std::cout << "書き込みm@s!" << std::endl;
 
 	cv::FileStorage wfs("../../../../CalibrationParameter/" + dind_id + "-20170109/" + dind_id + "-PC_extrinsic_calc.xml", cv::FileStorage::WRITE);
-	wfs << "param3D_array" << ER;
+	cv::write(wfs, "Rot", world_R);
+	cv::write(wfs, "trans", world_t);
+	//wfs << "param3D_array" << ER;
+	cv::WriteStructContext ws(wfs, "param3D_array", CV_NODE_SEQ);
+	for (int i = 0; i < 2; i++) {
+		cv::write(wfs, Rt[i]);
+	}
+
 	wfs.release();
+	WER.release();
+	LER.release();
 
 	std::cout << "Finish!" << std::endl;
 	Sleep(INFINITE);
